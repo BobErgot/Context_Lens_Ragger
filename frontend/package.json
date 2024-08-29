@@ -1,0 +1,48 @@
+{
+  "name": "sia-chat-qna-frontend",
+  "version": "0.0.1",
+  "private": true,
+  "packageManager": "yarn@1.22.19",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "format": "prettier --write ."
+  },
+  "dependencies": {
+    "@chakra-ui/icons": "^2.1.1",
+    "@chakra-ui/react": "^2.8.2",
+    "@emotion/react": "^11.13.3",
+    "@emotion/styled": "^11.13.0",
+    "@langchain/core": "^0.2.31",
+    "@types/dompurify": "^3.0.5",
+    "@types/marked": "^5.0.1",
+    "@types/node": "22.5.1",
+    "@types/react": "18.3.4",
+    "@types/react-dom": "18.3.0",
+    "autoprefixer": "10.4.20",
+    "dompurify": "^3.0.8",
+    "emojisplosion": "^2.6.1",
+    "eslint": "9.9.1",
+    "eslint-config-next": "14.2.7",
+    "framer-motion": "^11.3.31",
+    "graphql": "^16.9.0",
+    "highlight.js": "^11.10.0",
+    "langsmith": "^0.1.48",
+    "marked": "^7.0.5",
+    "next": "14.2.7",
+    "postcss": "8.4.41",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "react-textarea-autosize": "^8.5.3",
+    "react-toastify": "^10.0.5",
+    "tailwindcss": "3.4.10",
+    "typescript": "5.5.4"
+  },
+  "devDependencies": {
+    "prettier": "^3.3.3",
+    "typescript": "5.5.4",
+    "weaviate-ts-client": "^2.2.0"
+  }
+}
