@@ -87,3 +87,5 @@ To download and manage Docker containers with a GUI, you can download **OrbStack
     docker run --name postgres -e POSTGRES_PASSWORD=mysecretpassword -d postgres
    ```
 This setup will allow you to run the Context_Lens_Ragger locally, enabling you to test and develop the application with your own documents and data.
+
+For a detailed overview of the backend, including routes, services, and database models, please refer to the [Backend_Readme.md](./backend_Readme.md) for more in-depth information.
