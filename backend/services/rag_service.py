@@ -25,10 +25,20 @@ from constants import (
     COLLECTION_NAME,
     RECORD_MANAGER_DB_URL
 )
-
 from document_store.chroma_store import ChromaDocumentStore
 
+
 def get_embeddings_model() -> OllamaEmbeddings:
+    """
+    Initializes and returns an instance of OllamaEmbeddings for generating embeddings.
+
+    This function sets up the OllamaEmbeddings model with the "nomic-embed-text" configuration,
+    which is used to generate vector representations of text data that can be stored and queried
+    in a vector store.
+
+    Returns:
+        OllamaEmbeddings: An instance of OllamaEmbeddings configured with the "nomic-embed-text" model.
+    """
     return OllamaEmbeddings(model="nomic-embed-text")
 
 
@@ -80,11 +90,25 @@ Standalone Question:"""
 
 
 class ChatRequest(BaseModel):
+    """
+    A model representing a chat request, including the current question and chat history.
+
+    Attributes:
+        question (str): The current question asked by the user.
+        chat_history (Optional[List[Dict[str, str]]]): An optional list of previous messages
+            in the chat, where each message is represented by a dictionary with "human" or "ai" keys.
+    """
     question: str
-    chat_history: Optional[List[Dict[str, str]]]
+    chat_history: Optional[List[Dict[str, str]]] = None
 
 
 def get_retriever() -> BaseRetriever:
+    """
+    Creates and returns a retriever that fetches relevant documents from a Chroma vector store.
+
+    Returns:
+        BaseRetriever: A retriever configured to search the Chroma document store with the provided embedding model.
+    """
     embedding = get_embeddings_model()
 
     document_store = ChromaDocumentStore(
@@ -94,17 +118,25 @@ def get_retriever() -> BaseRetriever:
     )
 
     retriever = document_store.get_retriever(search_kwargs=dict(k=6))
-
     return retriever
 
 
 def create_retriever_chain(llm: LanguageModelLike, retriever: BaseRetriever) -> Runnable:
+    """
+    Creates a chain for retrieving documents, optionally condensing the question if there is chat history.
+
+    Args:
+        llm (LanguageModelLike): The language model used to rephrase the question.
+        retriever (BaseRetriever): The retriever used to fetch relevant documents.
+
+    Returns:
+        Runnable: A runnable chain that handles both cases of having and not having chat history.
+    """
     CONDENSE_QUESTION_PROMPT = PromptTemplate.from_template(REPHRASE_TEMPLATE)
     condense_question_chain = (
             CONDENSE_QUESTION_PROMPT | llm | StrOutputParser()
-    ).with_config(
-        run_name="CondenseQuestion",
-    )
+    ).with_config(run_name="CondenseQuestion")
+
     conversation_chain = condense_question_chain | retriever
     return RunnableBranch(
         (
@@ -123,6 +155,15 @@ def create_retriever_chain(llm: LanguageModelLike, retriever: BaseRetriever) -> 
 
 
 def format_docs(docs: Sequence[Document]) -> str:
+    """
+    Formats a list of documents into a string with each document wrapped in <doc> tags.
+
+    Args:
+        docs (Sequence[Document]): A sequence of Document objects.
+
+    Returns:
+        str: A formatted string containing all documents, each wrapped in <doc> tags.
+    """
     formatted_docs = []
     for i, doc in enumerate(docs):
         doc_string = f"<doc id='{i}'>{doc.page_content}</doc>"
@@ -131,6 +172,15 @@ def format_docs(docs: Sequence[Document]) -> str:
 
 
 def serialize_history(request: ChatRequest):
+    """
+    Serializes the chat history from the chat request into a list of HumanMessage and AIMessage objects.
+
+    Args:
+        request (ChatRequest): The incoming chat request containing chat history.
+
+    Returns:
+        List[Union[HumanMessage, AIMessage]]: A list of serialized chat messages.
+    """
     chat_history = request["chat_history"] or []
     converted_chat_history = []
     for message in chat_history:
@@ -142,15 +192,24 @@ def serialize_history(request: ChatRequest):
 
 
 def create_chain(llm: LanguageModelLike, retriever: BaseRetriever) -> Runnable:
-    retriever_chain = create_retriever_chain(
-        llm,
-        retriever,
-    ).with_config(run_name="FindDocs")
+    """
+    Creates the main processing chain for answering a question based on retrieved documents.
+
+    Args:
+        llm (LanguageModelLike): The language model used for generating answers.
+        retriever (BaseRetriever): The retriever used to fetch relevant documents.
+
+    Returns:
+        Runnable: A runnable chain that processes the chat request, retrieves documents, and generates a response.
+    """
+    retriever_chain = create_retriever_chain(llm, retriever).with_config(run_name="FindDocs")
+
     context = (
         RunnablePassthrough.assign(docs=retriever_chain)
         .assign(context=lambda x: format_docs(x["docs"]))
         .with_config(run_name="RetrieveDocs")
     )
+
     prompt = ChatPromptTemplate.from_messages(
         [
             ("system", RESPONSE_TEMPLATE),
@@ -158,11 +217,11 @@ def create_chain(llm: LanguageModelLike, retriever: BaseRetriever) -> Runnable:
             ("human", "{question}"),
         ]
     )
+
     default_response_synthesizer = prompt | llm
 
     response_synthesizer = (
-            default_response_synthesizer
-            | StrOutputParser()
+            default_response_synthesizer | StrOutputParser()
     ).with_config(run_name="GenerateResponse")
 
     return (
@@ -172,7 +231,9 @@ def create_chain(llm: LanguageModelLike, retriever: BaseRetriever) -> Runnable:
     )
 
 
+# Initialize the Ollama language model and retriever
 llm = Ollama(model="mistral")
-
 retriever = get_retriever()
+
+# Create the answer chain using the language model and retriever
 answer_chain = create_chain(llm, retriever)

@@ -22,18 +22,28 @@ client = Client()
 
 router = APIRouter()
 
-# Define the backend root directory and data folder path
-BACKEND_ROOT = Path(__file__).resolve().parent.parent  # Adjust as needed
+BACKEND_ROOT = Path(__file__).resolve().parent.parent
 DATA_DIR = BACKEND_ROOT / 'data'
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 
 async def _arun(func, *args, **kwargs):
+    """
+    Run a synchronous function in a separate thread, returning the result asynchronously.
+    """
     return await asyncio.get_running_loop().run_in_executor(None, func, *args, **kwargs)
 
 
 @router.post("/upload-document/")
 async def upload_document(file: UploadFile = File(...), db: Session = Depends(get_db)):
+    """
+    Upload a document, process it to extract embeddings, and store it in the database.
+
+    :param file: The uploaded file.
+    :param db: The database session dependency.
+    :return: The result of the document processing.
+    :raises HTTPException: If the document processing fails.
+    """
     try:
         file_location = DATA_DIR / file.filename
         async with aiofiles.open(file_location, "wb") as out_file:
@@ -67,6 +77,13 @@ async def upload_document(file: UploadFile = File(...), db: Session = Depends(ge
 
 @router.get("/documents/")
 def fetch_documents(db: Session = Depends(get_db)):
+    """
+    Fetch all documents from the database.
+
+    :param db: The database session dependency.
+    :return: A list of documents.
+    :raises HTTPException: If there is an error fetching the documents.
+    """
     try:
         documents = get_documents(db)
         return {"status": "success", "documents": documents}
@@ -77,12 +94,19 @@ def fetch_documents(db: Session = Depends(get_db)):
 
 @router.delete("/documents/{document_id}")
 async def delete_document(document_id: uuid.UUID, db: Session = Depends(get_db)):
+    """
+    Delete a document and its associated embeddings from the database.
+
+    :param document_id: The UUID of the document to delete.
+    :param db: The database session dependency.
+    :return: A success message upon deletion.
+    :raises HTTPException: If the document is not found or if deletion fails.
+    """
     try:
         document = delete_document_by_id(db, document_id)
         if not document:
             raise HTTPException(status_code=404, detail="Document not found")
 
-        # Clear the document's embeddings from Chroma DB
         if document.embedding_ids:
             document_processor_service = DocumentProcessorService(
                 collection_name=COLLECTION_NAME,
@@ -98,6 +122,13 @@ async def delete_document(document_id: uuid.UUID, db: Session = Depends(get_db))
 
 @router.post("/upload-directory/")
 async def upload_directory(directory_path: str):
+    """
+    Process and upload all documents from a specified directory.
+
+    :param directory_path: The path to the directory containing documents to upload.
+    :return: The result of the document processing.
+    :raises HTTPException: If the directory processing fails.
+    """
     try:
         embedding_model = OllamaEmbeddings(model="nomic-embed-text")
         document_processor_service = DocumentProcessorService(
@@ -114,6 +145,12 @@ async def upload_directory(directory_path: str):
 
 @router.post("/feedback")
 async def send_feedback(body: SendFeedbackBody):
+    """
+    Submit feedback for a specific run.
+
+    :param body: The feedback details including run ID, key, score, and comment.
+    :return: A success message upon feedback submission.
+    """
     client.create_feedback(
         body.run_id,
         body.key,
@@ -126,6 +163,12 @@ async def send_feedback(body: SendFeedbackBody):
 
 @router.patch("/feedback")
 async def update_feedback(body: UpdateFeedbackBody):
+    """
+    Update existing feedback with new details.
+
+    :param body: The updated feedback details including feedback ID, score, and comment.
+    :return: A success message upon feedback update.
+    """
     feedback_id = body.feedback_id
     if feedback_id is None:
         return {
@@ -140,11 +183,13 @@ async def update_feedback(body: UpdateFeedbackBody):
     return {"result": "patched feedback successfully", "code": 200}
 
 
-async def _arun(func, *args, **kwargs):
-    return await asyncio.get_running_loop().run_in_executor(None, func, *args, **kwargs)
-
-
 async def aget_trace_url(run_id: str) -> str:
+    """
+    Retrieve or share a trace URL for a specific run ID.
+
+    :param run_id: The run ID to retrieve the trace URL for.
+    :return: The shared trace URL for the run.
+    """
     for i in range(5):
         try:
             await _arun(client.read_run, run_id)
@@ -159,6 +204,12 @@ async def aget_trace_url(run_id: str) -> str:
 
 @router.post("/get_trace")
 async def get_trace(body: GetTraceBody):
+    """
+    Retrieve the trace URL for a specific LangSmith run ID.
+
+    :param body: The body containing the run ID.
+    :return: The trace URL or an error message if the run ID is not provided.
+    """
     run_id = body.run_id
     if run_id is None:
         return {

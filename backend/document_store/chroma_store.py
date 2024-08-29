@@ -32,7 +32,7 @@ class ChromaDocumentStore(BaseDocumentStore):
             embedding_function=self.embeddings,
             persist_directory=self.index_path,
         )
-        self.document_count = 0  # Initialize to 0 and update manually
+        self.document_count = 0
 
     def add_documents(self, documents: List[Dict[str, Any]], batch_size: int = 1000) -> List[str]:
         """
